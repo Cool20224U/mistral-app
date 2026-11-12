@@ -1,7 +1,7 @@
 [package]
 name = "le-chat"
 version = "1.0.0"
-description = "Le Chat - Mistral AI Desktop App"
+description = "Mistral - Desktop app for Mistral AI"
 authors = ["you"]
 edition = "2021"
 

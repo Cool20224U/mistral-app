@@ -159,7 +159,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2.5.0
         with:
-          name: Le Chat ${{ github.ref_name }}
+          name: Mistral ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           generate_release_notes: true
