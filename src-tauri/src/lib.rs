@@ -25,9 +25,15 @@ struct AppSettings {
     notifications_enabled: bool,
     #[serde(default)]
     theme: Option<String>,
+    #[serde(default = "default_launcher_shortcut")]
+    launcher_shortcut: String,
+    #[serde(default = "default_zoom")]
+    zoom: f64,
 }
 
 fn default_true() -> bool { true }
+fn default_launcher_shortcut() -> String { "Alt+Space".to_string() }
+fn default_zoom() -> f64 { 1.0 }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -35,8 +41,130 @@ impl Default for AppSettings {
             new_chat_default: true,
             notifications_enabled: true,
             theme: None,
+            launcher_shortcut: default_launcher_shortcut(),
+            zoom: default_zoom(),
         }
     }
+}
+
+fn parse_key_code(key: &str) -> Option<Code> {
+    if key.len() == 1 {
+        let c = key.chars().next().unwrap();
+        if c.is_ascii_alphabetic() {
+            return Some(match c.to_ascii_uppercase() {
+                'A' => Code::KeyA,
+                'B' => Code::KeyB,
+                'C' => Code::KeyC,
+                'D' => Code::KeyD,
+                'E' => Code::KeyE,
+                'F' => Code::KeyF,
+                'G' => Code::KeyG,
+                'H' => Code::KeyH,
+                'I' => Code::KeyI,
+                'J' => Code::KeyJ,
+                'K' => Code::KeyK,
+                'L' => Code::KeyL,
+                'M' => Code::KeyM,
+                'N' => Code::KeyN,
+                'O' => Code::KeyO,
+                'P' => Code::KeyP,
+                'Q' => Code::KeyQ,
+                'R' => Code::KeyR,
+                'S' => Code::KeyS,
+                'T' => Code::KeyT,
+                'U' => Code::KeyU,
+                'V' => Code::KeyV,
+                'W' => Code::KeyW,
+                'X' => Code::KeyX,
+                'Y' => Code::KeyY,
+                'Z' => Code::KeyZ,
+                _ => return None,
+            });
+        }
+        if c.is_ascii_digit() {
+            return Some(match c {
+                '0' => Code::Digit0,
+                '1' => Code::Digit1,
+                '2' => Code::Digit2,
+                '3' => Code::Digit3,
+                '4' => Code::Digit4,
+                '5' => Code::Digit5,
+                '6' => Code::Digit6,
+                '7' => Code::Digit7,
+                '8' => Code::Digit8,
+                '9' => Code::Digit9,
+                _ => return None,
+            });
+        }
+        return Some(match c {
+            ',' => Code::Comma,
+            '.' => Code::Period,
+            '/' => Code::Slash,
+            ';' => Code::Semicolon,
+            '\'' => Code::Quote,
+            '[' => Code::BracketLeft,
+            ']' => Code::BracketRight,
+            '`' => Code::Backquote,
+            '-' => Code::Minus,
+            '=' => Code::Equal,
+            '\\' => Code::Backslash,
+            _ => return None,
+        });
+    }
+    Some(match key {
+        "space" => Code::Space,
+        "enter" => Code::Enter,
+        "tab" => Code::Tab,
+        "f1" => Code::F1,
+        "f2" => Code::F2,
+        "f3" => Code::F3,
+        "f4" => Code::F4,
+        "f5" => Code::F5,
+        "f6" => Code::F6,
+        "f7" => Code::F7,
+        "f8" => Code::F8,
+        "f9" => Code::F9,
+        "f10" => Code::F10,
+        "f11" => Code::F11,
+        "f12" => Code::F12,
+        _ => return None,
+    })
+}
+
+fn parse_shortcut(s: &str) -> Result<Shortcut, String> {
+    let mut modifiers = Modifiers::empty();
+    let mut code: Option<Code> = None;
+    for part in s.split('+') {
+        let p = part.trim().to_lowercase();
+        if p.is_empty() {
+            continue;
+        }
+        match p.as_str() {
+            "ctrl" | "control" => modifiers |= Modifiers::CONTROL,
+            "alt" | "option" => modifiers |= Modifiers::ALT,
+            "shift" => modifiers |= Modifiers::SHIFT,
+            "super" | "meta" | "cmd" | "command" => modifiers |= Modifiers::SUPER,
+            _ => {
+                if code.is_some() {
+                    return Err(format!("Invalid shortcut '{}': multiple keys", s));
+                }
+                code = Some(
+                    parse_key_code(&p).ok_or_else(|| format!("Unknown key '{}' in shortcut '{}'", part, s))?,
+                );
+            }
+        }
+    }
+    let code = code.ok_or_else(|| format!("No key in shortcut '{}'", s))?;
+    Ok(Shortcut::new(Some(modifiers), code))
+}
+
+fn load_settings_sync(app: &AppHandle) -> AppSettings {
+    use tauri_plugin_store::StoreExt;
+    app.store("settings.json")
+        .ok()
+        .and_then(|store| store.get("app_settings"))
+        .and_then(|v| serde_json::from_value::<AppSettings>(v).ok())
+        .unwrap_or_default()
 }
 
 // JavaScript to inject custom styles that hide the workspace button
@@ -291,6 +419,213 @@ fn get_theme_watcher_js() -> String {
     .to_string()
 }
 
+// JavaScript to handle zoom keyboard/wheel shortcuts in the main window.
+// Persists the zoom factor via the `set_zoom` Tauri command.
+fn get_zoom_js() -> String {
+    r#"
+    (function() {
+        if (window.__mistralZoom) return;
+        window.__mistralZoom = true;
+
+        function clamp(z) { return Math.min(2, Math.max(0.5, z)); }
+        function current() { return parseFloat(window.__mistralZoomValue) || 1; }
+        function apply(z) {
+            z = clamp(Math.round(z * 100) / 100);
+            window.__mistralZoomValue = z;
+            if (window.__TAURI__) {
+                window.__TAURI__.core.invoke('set_zoom', { zoom: z }).catch(function(e) {
+                    console.error('[Mistral] Failed to set zoom:', e);
+                });
+            }
+        }
+
+        if (window.__TAURI__) {
+            window.__TAURI__.core.invoke('get_settings').then(function(s) {
+                window.__mistralZoomValue = s && s.zoom ? s.zoom : 1;
+            }).catch(function() {
+                window.__mistralZoomValue = 1;
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (!(e.ctrlKey || e.metaKey)) return;
+            const k = (e.key || '').toLowerCase();
+            if (k === '=' || k === '+') {
+                e.preventDefault();
+                apply(current() + 0.1);
+            } else if (k === '-') {
+                e.preventDefault();
+                apply(current() - 0.1);
+            } else if (k === '0') {
+                e.preventDefault();
+                apply(1);
+            }
+        });
+
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                apply(current() + (e.deltaY < 0 ? 0.1 : -0.1));
+            }
+        }, { passive: false });
+    })();
+    "#
+    .to_string()
+}
+
+// JavaScript to provide find-in-chat (Ctrl+F) with a minimal floating bar.
+// Highlights matches with <mark> elements; Enter/Shift+Enter cycle, Escape closes.
+fn get_find_bar_js() -> String {
+    r#"
+    (function() {
+        if (window.__mistralFind) return;
+        window.__mistralFind = true;
+
+        let bar = null;
+        let input = null;
+        let counter = null;
+        let marks = [];
+        let activeIdx = -1;
+
+        function buildBar() {
+            bar = document.createElement('div');
+            bar.setAttribute('data-mistral-find-bar', '');
+            bar.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:#1a1a1e;color:#f5f5f7;box-shadow:0 4px 16px rgba(0,0,0,0.35);font:13px sans-serif;';
+            input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = 'Find in chat';
+            input.style.cssText = 'width:200px;padding:4px 8px;border:1px solid #4a4a52;border-radius:6px;background:#26262c;color:#f5f5f7;outline:none;font:13px sans-serif;';
+            counter = document.createElement('span');
+            counter.style.cssText = 'min-width:52px;text-align:center;color:#b8b8bf;';
+            bar.appendChild(input);
+            bar.appendChild(counter);
+            document.body.appendChild(bar);
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    jump(e.shiftKey ? -1 : 1);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeBar();
+                }
+            });
+            input.addEventListener('input', function() {
+                search(input.value);
+            });
+            input.addEventListener('blur', function() {
+                setTimeout(function() {
+                    if (document.activeElement !== input) closeBar();
+                }, 150);
+            });
+        }
+
+        function clearMarks() {
+            marks.forEach(function(m) {
+                const parent = m.parentNode;
+                if (parent) {
+                    while (m.firstChild) parent.insertBefore(m.firstChild, m);
+                    parent.removeChild(m);
+                    parent.normalize();
+                }
+            });
+            marks = [];
+            activeIdx = -1;
+        }
+
+        function search(text) {
+            clearMarks();
+            const query = (text || '').trim().toLowerCase();
+            updateCounter();
+            if (!query || query.length < 2) return;
+
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                acceptNode: function(node) {
+                    const p = node.parentNode;
+                    if (!p || p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'MARK' || p.closest('[data-mistral-find-bar]')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            });
+
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+
+            nodes.forEach(function(node) {
+                const value = node.nodeValue;
+                const lower = value.toLowerCase();
+                let pos = lower.indexOf(query);
+                if (pos === -1) return;
+                const fragment = document.createDocumentFragment();
+                let last = 0;
+                while (pos !== -1) {
+                    if (pos > last) fragment.appendChild(document.createTextNode(value.slice(last, pos)));
+                    const m = document.createElement('mark');
+                    m.setAttribute('data-mistral-find', '');
+                    m.style.cssText = 'background:#ffe066;color:inherit;';
+                    m.textContent = value.slice(pos, pos + query.length);
+                    fragment.appendChild(m);
+                    marks.push(m);
+                    last = pos + query.length;
+                    pos = lower.indexOf(query, last);
+                }
+                if (last < value.length) fragment.appendChild(document.createTextNode(value.slice(last)));
+                node.parentNode.replaceChild(fragment, node);
+            });
+            updateCounter();
+            if (marks.length) jump(1);
+        }
+
+        function jump(dir) {
+            if (!marks.length) return;
+            if (activeIdx >= 0 && marks[activeIdx]) {
+                marks[activeIdx].style.background = '#ffe066';
+            }
+            activeIdx = (activeIdx + dir + marks.length) % marks.length;
+            const m = marks[activeIdx];
+            m.style.background = '#ff9f43';
+            m.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            updateCounter();
+        }
+
+        function updateCounter() {
+            if (!counter) return;
+            counter.textContent = marks.length ? (activeIdx + 1) + '/' + marks.length : '0/0';
+        }
+
+        function closeBar() {
+            clearMarks();
+            if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+            bar = null;
+            input = null;
+            counter = null;
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                e.preventDefault();
+                if (!bar) {
+                    buildBar();
+                    search('');
+                }
+                input.focus();
+                input.select();
+            } else if (e.key === 'Escape' && bar) {
+                e.preventDefault();
+                closeBar();
+            } else if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G'))) {
+                if (bar && marks.length) {
+                    e.preventDefault();
+                    jump(e.shiftKey ? -1 : 1);
+                }
+            }
+        });
+    })();
+    "#
+    .to_string()
+}
+
 #[cfg(target_os = "macos")]
 fn get_macos_titlebar_padding_js() -> String {
     r#"
@@ -506,8 +841,35 @@ async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), Stri
     store.set("app_settings", value);
     store.save().map_err(|e| e.to_string())?;
 
+    // Re-register the global shortcut in case it changed
+    if let Err(e) = register_launcher_shortcut(&app) {
+        eprintln!("Failed to re-register launcher shortcut: {}", e);
+    }
+
     // Emit settings-changed event so other windows can react
     let _ = app.emit("settings-changed", &settings);
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_zoom(app: AppHandle, zoom: f64) -> Result<(), String> {
+    let zoom = zoom.clamp(0.5, 2.0);
+    if let Some(main_window) = app.get_webview_window("main") {
+        main_window.set_zoom(zoom).map_err(|e| e.to_string())?;
+    }
+
+    use tauri_plugin_store::StoreExt;
+    if let Ok(store) = app.store("settings.json") {
+        let mut settings = match store.get("app_settings") {
+            Some(value) => serde_json::from_value::<AppSettings>(value).unwrap_or_default(),
+            None => AppSettings::default(),
+        };
+        settings.zoom = zoom;
+        if let Ok(value) = serde_json::to_value(&settings) {
+            store.set("app_settings", value);
+            let _ = store.save();
+        }
+    }
     Ok(())
 }
 
@@ -588,36 +950,38 @@ fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn setup_global_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // Platform-specific shortcut: Alt+Space on Windows, Option+Space on macOS
-    #[cfg(target_os = "macos")]
-    let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-
-    #[cfg(target_os = "windows")]
-    let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-
-    #[cfg(target_os = "linux")]
-    let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
+fn register_launcher_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let settings = load_settings_sync(app);
+    let shortcut_str = if settings.launcher_shortcut.trim().is_empty() {
+        default_launcher_shortcut()
+    } else {
+        settings.launcher_shortcut
+    };
+    let shortcut = parse_shortcut(&shortcut_str).map_err(Box::<dyn std::error::Error>::from)?;
 
     let app_handle = app.clone();
-
-    app.global_shortcut()
-        .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            if event.state == ShortcutState::Pressed {
-                if let Some(launcher) = app_handle.get_webview_window("launcher") {
-                    let is_visible = launcher.is_visible().unwrap_or(false);
-                    if is_visible {
-                        let _ = launcher.hide();
-                    } else {
-                        let _ = launcher.center();
-                        let _ = launcher.show();
-                        let _ = launcher.set_focus();
-                    }
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    gs.on_shortcut(shortcut, move |_app, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            if let Some(launcher) = app_handle.get_webview_window("launcher") {
+                let is_visible = launcher.is_visible().unwrap_or(false);
+                if is_visible {
+                    let _ = launcher.hide();
+                } else {
+                    let _ = launcher.center();
+                    let _ = launcher.show();
+                    let _ = launcher.set_focus();
                 }
             }
-        })?;
+        }
+    })?;
 
     Ok(())
+}
+
+fn setup_global_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    register_launcher_shortcut(app)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -645,6 +1009,7 @@ pub fn run() {
             resize_launcher,
             get_settings,
             save_settings,
+            set_zoom,
             show_settings,
         ])
         .setup(|app| {
@@ -868,6 +1233,14 @@ pub fn run() {
                 // Inject theme watcher to sync dark/light mode from Mistral
                 let theme_js = get_theme_watcher_js();
                 let _ = main_window.eval(&theme_js);
+
+                // Inject zoom controls and find-in-chat into the main window
+                let _ = main_window.eval(&get_zoom_js());
+                let _ = main_window.eval(&get_find_bar_js());
+
+                // Apply the saved zoom factor
+                let settings = load_settings_sync(app.handle());
+                let _ = main_window.set_zoom(settings.zoom);
                 
                 // Keep watching theme on page navigation (since it's an SPA, 
                 // the document element might persist, but if there's a hard reload we need to re-inject)
@@ -876,6 +1249,8 @@ pub fn run() {
                     if let tauri::WindowEvent::Focused(true) = event {
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.eval(&get_theme_watcher_js());
+                            let _ = window.eval(&get_zoom_js());
+                            let _ = window.eval(&get_find_bar_js());
                             
                             #[cfg(target_os = "macos")]
                             {
@@ -1026,6 +1401,59 @@ mod tests {
         assert!(js.contains("le-chat-custom-styles"));
         assert!(js.contains("data-sidebar"));
         assert!(js.contains("MutationObserver"));
+    }
+
+    #[test]
+    fn test_parse_shortcut_default() {
+        let shortcut = parse_shortcut("Alt+Space");
+        assert!(shortcut.is_ok(), "Default Alt+Space should parse");
+    }
+
+    #[test]
+    fn test_parse_shortcut_variants() {
+        for s in [
+            "Ctrl+K",
+            "Ctrl+Shift+F",
+            "Alt+Space",
+            "Super+J",
+            "Ctrl+Digit1",
+            "Ctrl+F1",
+            "ctrl+k",
+        ] {
+            assert!(parse_shortcut(s).is_ok(), "Shortcut '{}' should parse", s);
+        }
+    }
+
+    #[test]
+    fn test_parse_shortcut_invalid() {
+        assert!(parse_shortcut("").is_err());
+        assert!(parse_shortcut("Ctrl").is_err(), "Modifier-only shortcut should fail");
+        assert!(parse_shortcut("Ctrl+Foo").is_err(), "Unknown key should fail");
+        assert!(parse_shortcut("Ctrl+A+B").is_err(), "Multiple keys should fail");
+    }
+
+    #[test]
+    fn test_settings_defaults_include_new_fields() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.launcher_shortcut, "Alt+Space");
+        assert_eq!(settings.zoom, 1.0);
+
+        let json = serde_json::json!({ "new_chat_default": false });
+        let result: AppSettings = serde_json::from_value(json).unwrap();
+        assert_eq!(result.launcher_shortcut, "Alt+Space");
+        assert_eq!(result.zoom, 1.0);
+    }
+
+    #[test]
+    fn test_zoom_js_and_find_bar_js_valid() {
+        let zoom_js = get_zoom_js();
+        assert!(zoom_js.contains("set_zoom"));
+        assert!(zoom_js.contains("__mistralZoom"));
+
+        let find_js = get_find_bar_js();
+        assert!(find_js.contains("__mistralFind"));
+        assert!(find_js.contains("Find in chat"));
+        assert!(find_js.contains("data-mistral-find"));
     }
 
     #[test]

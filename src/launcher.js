@@ -22,19 +22,141 @@ class LauncherApp {
     this.history = JSON.parse(localStorage.getItem('launcher_history') || '[]');
     this.historyIndex = -1;
     this.currentDraft = '';
-    
+
+    // History dropdown
+    this.dropdown = null;
+    this.dropdownItems = [];
+    this.dropdownSelectedIndex = -1;
+    this.dropdownBlurTimeout = null;
+
     // Validate elements
     if (!this.input || !this.submitBtn) {
       console.error('Critical UI elements not found. Launcher cannot initialize.');
       return;
     }
-    
+
+    this.initHistoryDropdown();
+
     // Set platform-aware modifier key labels
     this.initModifierKeys();
-    
+
     // Initialize event listeners
     this.initEventListeners();
     this.initTauriListeners();
+  }
+
+  initHistoryDropdown() {
+    const wrapper = document.querySelector('.launcher-input-wrapper')
+      || document.querySelector('.launcher-container');
+    if (!wrapper) return;
+
+    this.dropdown = document.createElement('div');
+    this.dropdown.className = 'launcher-history-dropdown';
+    this.dropdown.style.display = 'none';
+    wrapper.appendChild(this.dropdown);
+  }
+
+  syncWindowHeight() {
+    try {
+      const baseWindowHeight = 88;
+      const baseInputHeight = 24;
+      const inputHeight = this.input ? (parseInt(this.input.style.height, 10) || baseInputHeight) : baseInputHeight;
+      const extraHeight = Math.max(0, inputHeight - baseInputHeight);
+      let height = baseWindowHeight + extraHeight;
+      if (this.isDropdownVisible() && this.dropdown) {
+        height += this.dropdown.offsetHeight + 8;
+      }
+      invoke('resize_launcher', { height }).catch(e => {
+        console.warn('Could not resize window', e);
+      });
+    } catch (e) {
+      console.warn('Error invoking resize_launcher', e);
+    }
+  }
+
+  getFilteredHistory() {
+    const query = (this.input?.value || '').trim().toLowerCase();
+    const seen = new Set();
+    const items = [];
+    for (const item of this.history) {
+      if (query && !item.toLowerCase().startsWith(query)) continue;
+      if (seen.has(item)) continue;
+      seen.add(item);
+      items.push(item);
+      if (items.length >= 8) break;
+    }
+    return items;
+  }
+
+  showHistoryDropdown() {
+    if (!this.dropdown) return;
+    this.dropdownItems = this.getFilteredHistory();
+    this.dropdownSelectedIndex = -1;
+
+    if (this.dropdownItems.length === 0) {
+      this.hideHistoryDropdown();
+      return;
+    }
+
+    this.dropdown.innerHTML = '';
+    this.dropdownItems.forEach((item, i) => {
+      const div = document.createElement('div');
+      div.className = 'launcher-history-item';
+      div.dataset.index = i;
+      const span = document.createElement('span');
+      span.className = 'launcher-history-text';
+      span.textContent = item.length > 80 ? item.slice(0, 80) + '…' : item;
+      div.appendChild(span);
+      div.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.selectHistoryItem(i);
+      });
+      this.dropdown.appendChild(div);
+    });
+
+    this.dropdown.style.display = 'block';
+    this.syncWindowHeight();
+  }
+
+  hideHistoryDropdown() {
+    if (!this.dropdown) return;
+    const wasVisible = this.isDropdownVisible();
+    this.dropdown.style.display = 'none';
+    this.dropdown.innerHTML = '';
+    this.dropdownItems = [];
+    this.dropdownSelectedIndex = -1;
+    if (wasVisible) {
+      this.syncWindowHeight();
+    }
+  }
+
+  isDropdownVisible() {
+    return !!this.dropdown && this.dropdown.style.display !== 'none';
+  }
+
+  navigateHistoryDropdown(direction) {
+    if (!this.dropdownItems.length) return;
+    this.dropdownSelectedIndex = (this.dropdownSelectedIndex + direction + this.dropdownItems.length) % this.dropdownItems.length;
+    this.updateHistoryDropdownSelection();
+    const el = this.dropdown.children[this.dropdownSelectedIndex];
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+
+  updateHistoryDropdownSelection() {
+    Array.from(this.dropdown.children).forEach((el, i) => {
+      el.classList.toggle('selected', i === this.dropdownSelectedIndex);
+    });
+  }
+
+  selectHistoryItem(index) {
+    const item = this.dropdownItems[index];
+    if (item === undefined || !this.input) return;
+    this.input.value = item;
+    this.historyIndex = -1;
+    this.hideHistoryDropdown();
+    this.autoResizeInput();
+    this.input.focus();
+    this.input.selectionStart = this.input.selectionEnd = this.input.value.length;
   }
   
   initModifierKeys() {
@@ -62,6 +184,13 @@ class LauncherApp {
     
     // Auto-resize textarea
     this.input.addEventListener('input', () => this.autoResizeInput());
+
+    // History dropdown: show on input and on focus, hide on blur
+    this.input.addEventListener('input', () => this.showHistoryDropdown());
+    this.input.addEventListener('focus', () => this.showHistoryDropdown());
+    this.input.addEventListener('blur', () => {
+      this.dropdownBlurTimeout = setTimeout(() => this.hideHistoryDropdown(), 120);
+    });
     
     // Submit button
     this.submitBtn.addEventListener('click', () => this.submitMessage());
@@ -86,6 +215,7 @@ class LauncherApp {
     listen('launcher-shown', () => {
       if (this.input) {
         this.input.value = '';
+        this.hideHistoryDropdown();
         this.autoResizeInput();
         this.input.focus();
       }
@@ -211,39 +341,58 @@ class LauncherApp {
   
   handleKeyDown(e) {
     try {
-      // Escape to hide launcher
+      // Escape to close dropdown first, then hide launcher
       if (e.key === 'Escape') {
+        if (this.isDropdownVisible()) {
+          e.preventDefault();
+          this.hideHistoryDropdown();
+          return;
+        }
         e.preventDefault();
         invoke('hide_launcher').catch(error => {
           console.error('Failed to hide launcher:', error);
         });
         return;
       }
-      
+
       // Cmd/Ctrl+N to toggle new chat mode
       if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         this.toggleNewChat();
         return;
       }
-      
-      // Enter to submit
+
+      // Enter: select a dropdown item if one is highlighted, otherwise submit
       if (e.key === 'Enter' && !e.shiftKey && this.input) {
+        if (this.isDropdownVisible() && this.dropdownSelectedIndex >= 0) {
+          e.preventDefault();
+          this.selectHistoryItem(this.dropdownSelectedIndex);
+          return;
+        }
         e.preventDefault();
+        this.hideHistoryDropdown();
         this.submitMessage();
         return;
       }
 
-      // History navigation
+      // Arrow keys navigate the dropdown when visible, otherwise inline history
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        this.navigateHistory(1);
+        if (this.isDropdownVisible()) {
+          this.navigateHistoryDropdown(-1);
+        } else {
+          this.navigateHistory(1);
+        }
         return;
       }
-      
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        this.navigateHistory(-1);
+        if (this.isDropdownVisible()) {
+          this.navigateHistoryDropdown(1);
+        } else {
+          this.navigateHistory(-1);
+        }
         return;
       }
     } catch (error) {
@@ -296,17 +445,7 @@ class LauncherApp {
 
     // Adjust Tauri window height (default base height is 88)
     // The base input height is roughly 24px.
-    try {
-      const baseWindowHeight = 88;
-      const baseInputHeight = 24;
-      const extraHeight = Math.max(0, newHeight - baseInputHeight);
-      
-      invoke('resize_launcher', { height: baseWindowHeight + extraHeight }).catch(e => {
-        console.warn("Could not resize window", e);
-      });
-    } catch (e) {
-      console.warn("Error invoking resize_launcher", e);
-    }
+    this.syncWindowHeight();
   }
 
   navigateHistory(direction) {

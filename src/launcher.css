@@ -397,3 +397,47 @@ html.dark .launcher-container.launcher-error {
   0% { transform: scale(1) rotate(0deg); }
   100% { transform: scale(1) rotate(360deg); }
 }
+
+.launcher-history-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  z-index: 10;
+}
+
+.launcher-history-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.launcher-history-item:hover,
+.launcher-history-item.selected {
+  background: var(--accent-subtle);
+}
+
+.launcher-history-text {
+  color: var(--text-primary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.launcher-history-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.launcher-history-dropdown::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+}

@@ -6,6 +6,10 @@ A native desktop app for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI's c
 
 - **Native Desktop App**: Full-featured desktop application for Windows and macOS
 - **Quick Launcher**: Press `Alt+Space` (Windows) or `Option+Space` (macOS) to open a spotlight-style quick input
+- **Customizable Hotkey**: Change the launcher shortcut from Settings — click the shortcut button and press your preferred key combination
+- **Launcher History**: Recent prompts appear in a dropdown below the launcher input — filter as you type, navigate with arrow keys, Enter to reuse
+- **Zoom Controls**: `Ctrl` + scroll wheel (or `Ctrl` +/`-`/0) to zoom the chat; the zoom level is remembered between launches
+- **Find in Chat**: `Ctrl+F` opens a find bar to search the current conversation — Enter/Shift+Enter cycle matches, F3 next, Escape closes
 - **System Tray**: App runs in the background with a tray icon for quick access
 - **Dark/Light Mode**: Automatically matches your system theme
 - **External Links**: Links in chat open in your default browser
@@ -28,6 +32,10 @@ A native desktop app for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI's c
 - Press `Alt+Space` (Windows) or `Option+Space` (macOS) to open the launcher
 - Type your message and press `Enter` to send
 - Press `Escape` to close the launcher
+- Recent prompts appear in a dropdown as you type — use the arrow keys to navigate and `Enter` to reuse one
+
+### Changing the Hotkey
+Open Settings from the tray menu and click the shortcut button under **Shortcut**, then press the key combination you want (e.g. `Ctrl+Shift+M`). The new shortcut takes effect immediately.
 
 ### Main Window
 - Click the tray icon to show the main window
@@ -86,12 +94,6 @@ mistral-app/
 - **Windows**: `src-tauri/target/release/bundle/msi/Mistral_1.0.0_x64.msi`
 
 ## Configuration
-
-### Changing the Hotkey
-Edit `src-tauri/src/lib.rs` and modify the shortcut in `setup_global_shortcut()`:
-```rust
-let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-```
 
 ### Window Sizes
 Edit `src-tauri/tauri.conf.json` to change default window dimensions.
