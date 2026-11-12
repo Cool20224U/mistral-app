@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for Le Chat windows",
+  "description": "Capability for Mistral windows",
   "windows": ["main", "launcher", "settings"],
   "permissions": [
     "core:default",

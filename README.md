@@ -1,6 +1,6 @@
-# Le Chat - Mistral AI Desktop App
+# Mistral — Desktop App for Mistral AI
 
-A native desktop wrapper for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI's chat interface) with a quick launcher feature inspired by Claude Desktop.
+A native desktop app for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI's chat interface) with a quick launcher feature inspired by Claude Desktop.
 
 ## Features
 
@@ -13,8 +13,8 @@ A native desktop wrapper for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI
 ## Installation
 
 ### macOS
-1. Download `Le Chat_1.0.0_aarch64.dmg` from the releases
-2. Open the DMG and drag `Le Chat.app` to your Applications folder
+1. Download `Mistral_1.0.0_aarch64.dmg` from the releases
+2. Open the DMG and drag `Mistral.app` to your Applications folder
 3. Launch from Applications
 
 ### Windows
@@ -81,9 +81,9 @@ mistral-app/
 ```
 
 ### Build Outputs
-- **macOS**: `src-tauri/target/release/bundle/macos/Le Chat.app`
-- **macOS DMG**: `src-tauri/target/release/bundle/dmg/Le Chat_1.0.0_aarch64.dmg`
-- **Windows**: `src-tauri/target/release/bundle/msi/Le Chat_1.0.0_x64.msi`
+- **macOS**: `src-tauri/target/release/bundle/macos/Mistral.app`
+- **macOS DMG**: `src-tauri/target/release/bundle/dmg/Mistral_1.0.0_aarch64.dmg`
+- **Windows**: `src-tauri/target/release/bundle/msi/Mistral_1.0.0_x64.msi`
 
 ## Configuration
 

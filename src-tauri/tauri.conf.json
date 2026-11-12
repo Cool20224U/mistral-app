@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Le Chat",
+  "productName": "Mistral",
   "version": "1.0.0",
-  "identifier": "ai.mistral.lechat",
+  "identifier": "com.cool20224u.mistral",
   "build": {
     "frontendDist": "../src"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Le Chat",
+        "title": "Mistral",
         "url": "https://chat.mistral.ai/chat",
         "width": 1200,
         "height": 800,
@@ -25,7 +25,7 @@
       },
       {
         "label": "launcher",
-        "title": "Le Chat Launcher",
+        "title": "Mistral Launcher",
         "url": "launcher.html",
         "width": 660,
         "height": 88,
@@ -40,7 +40,7 @@
       },
       {
         "label": "settings",
-        "title": "Le Chat Settings",
+        "title": "Mistral Settings",
         "url": "settings.html",
         "width": 520,
         "height": 460,
@@ -67,7 +67,7 @@
     ],
     "category": "Productivity",
     "shortDescription": "Mistral AI Chat Desktop App",
-    "longDescription": "A desktop wrapper for Le Chat - Mistral AI's conversational assistant. Features a quick launcher accessible via Alt+Space (Windows) or Option+Space (macOS).",
+    "longDescription": "A native desktop app for Mistral AI (Le Chat). Features a quick launcher accessible via Alt+Space (Windows) or Option+Space (macOS).",
     "macOS": {
       "minimumSystemVersion": "10.15",
       "exceptionDomain": "chat.mistral.ai"

@@ -521,7 +521,7 @@ async fn show_settings(app: AppHandle) -> Result<(), String> {
 }
 
 fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let show_item = MenuItem::with_id(app, "show", "Show Le Chat", true, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "show", "Show Mistral", true, None::<&str>)?;
     let launcher_item = MenuItem::with_id(app, "launcher", "Quick Ask...", true, None::<&str>)?;
     let separator1 = PredefinedMenuItem::separator(app)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
@@ -726,7 +726,7 @@ pub fn run() {
                         let _ = app_handle
                             .notification()
                             .builder()
-                            .title("Le Chat")
+                            .title("Mistral")
                             .body("Response ready")
                             .show();
 

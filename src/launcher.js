@@ -1,4 +1,4 @@
-// Le Chat Launcher JavaScript
+// Mistral Launcher JavaScript
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
@@ -106,7 +106,7 @@ class LauncherApp {
           }
           if (this.input) {
             this.input.placeholder = this.newChatMode
-              ? 'Ask Le Chat anything...'
+              ? 'Ask Mistral anything...'
               : 'Continue current chat...';
           }
         }
@@ -167,7 +167,7 @@ class LauncherApp {
     setTimeout(() => {
       container.classList.remove('launcher-error');
       if (this.input) {
-        this.input.placeholder = 'Ask Le Chat anything...';
+        this.input.placeholder = 'Ask Mistral anything...';
       }
     }, 2500);
   }
@@ -194,7 +194,7 @@ class LauncherApp {
       }
       if (this.input) {
         this.input.placeholder = this.newChatMode
-          ? 'Ask Le Chat anything...'
+          ? 'Ask Mistral anything...'
           : 'Continue current chat...';
       }
     } catch (error) {
@@ -351,7 +351,7 @@ class LauncherApp {
     // Update placeholder to reflect mode
     if (this.input) {
       this.input.placeholder = this.newChatMode
-        ? 'Ask Le Chat anything...'
+        ? 'Ask Mistral anything...'
         : 'Continue current chat...';
     }
   }
