@@ -35,7 +35,7 @@ A native desktop app for [Le Chat](https://chat.mistral.ai/chat) (Mistral AI's c
 - Close the window to hide to tray (app keeps running)
 
 ### System Tray Menu
-- **Show Le Chat**: Open the main chat window
+- **Show Mistral**: Open the main chat window
 - **Quick Ask...**: Open the launcher
 - **Quit**: Exit the application
 
